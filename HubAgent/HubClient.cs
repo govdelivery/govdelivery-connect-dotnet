@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -108,38 +108,44 @@ namespace HubAgent
                 if (link.rel == "actions")
                 {
                     String endpoint = link.href + "/statuses";
-                    HttpResponseMessage response = await connection.GetAsync(endpoint);
-                    if (response.IsSuccessStatusCode)
+                    List<Event> events = new List<Event>();
+                    //since hub limits the number of returned events to be 500 max, loop to pull any additional events
+                    do
                     {
-                        MemoryStream data = (MemoryStream)(await response.Content.ReadAsStreamAsync());
-                        DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(List<Event>));
-                        var events = (List<Event>)serializer.ReadObject(data);
-
-                        Dictionary<int, int> messageStatuses = new Dictionary<int, int>();
-                        foreach (Event ev in events)
+                        HttpResponseMessage response = await connection.GetAsync(endpoint);
+                        if (response.IsSuccessStatusCode)
                         {
-                            if (ev.name == "email_sent")
+                            MemoryStream data = (MemoryStream)(await response.Content.ReadAsStreamAsync());
+                            DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(List<Event>));
+                            events = (List<Event>)serializer.ReadObject(data);
+
+                            Dictionary<int, int> messageStatuses = new Dictionary<int, int>();
+                            foreach (Event ev in events)
                             {
-                                dynamicsClient.AssociateGovdeliveryEmail(ev.external_id, ev.message_id.ToString());
-                            }
-                            else if (ev.name == "email_status")
-                            {
-                                var statusIndex = transitions.IndexOf(ev.status);
-                                if ((statusIndex > -1) && (!messageStatuses.ContainsKey(ev.message_id) ||
-                                    ( statusIndex > messageStatuses[ev.message_id]))) {
+                                if (ev.name == "email_sent")
+                                {
+                                    dynamicsClient.AssociateGovdeliveryEmail(ev.external_id, ev.message_id.ToString());
+                                }
+                                else if (ev.name == "email_status")
+                                {
+                                    var statusIndex = transitions.IndexOf(ev.status);
+                                    if ((statusIndex > -1) && (!messageStatuses.ContainsKey(ev.message_id) ||
+                                        (statusIndex > messageStatuses[ev.message_id])))
+                                    {
                                         messageStatuses[ev.message_id] = statusIndex;
+                                    }
+                                }
+                            }
+                            foreach (KeyValuePair<int, int> message in messageStatuses)
+                            {
+                                var dynamicsId = dynamicsClient.LookupEmailByGovdeliveryId(message.Key.ToString());
+                                if (dynamicsId != null)
+                                {
+                                    dynamicsClient.UpdateStatus(dynamicsId, statuses[message.Value]);
                                 }
                             }
                         }
-                        foreach (KeyValuePair<int, int> message in messageStatuses)
-                        {
-                            var dynamicsId = dynamicsClient.LookupEmailByGovdeliveryId(message.Key.ToString());
-                            if (dynamicsId != null)
-                            {
-                                dynamicsClient.UpdateStatus(dynamicsId, statuses[message.Value]);
-                            }
-                        }
-                    }
+                    } while (events.Count > 0);
                 }
             }
         }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -22,18 +22,19 @@ namespace HubAgentTest
 {
     public class FakeHttpMessageHandler : HttpMessageHandler
     {
-        private HttpResponseMessage response;
+        private List<HttpResponseMessage> responses;
 
-        public FakeHttpMessageHandler(HttpResponseMessage response)
+        public FakeHttpMessageHandler(List<HttpResponseMessage> responses)
         {
-            this.response = response;
+            this.responses = responses;
         }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var responseTask = new TaskCompletionSource<HttpResponseMessage>();
+            var response = responses[0];
             responseTask.SetResult(response);
-
+            responses.RemoveAt(0);
             return responseTask.Task;
         }
     }
@@ -143,7 +144,7 @@ namespace HubAgentTest
             connector.links = new List<Link>();
             connector.links.Add(link1);
 
-            var fakeResponseHandler = new FakeHttpMessageHandler(eventResponse(events));
+            var fakeResponseHandler = new FakeHttpMessageHandler(eventResponse(events, new List<Event>()));
             var fakeHttpClient = new HttpClient(fakeResponseHandler);
             fakeHttpClient.BaseAddress = new Uri("https://blah.test.com");
 
@@ -187,7 +188,7 @@ namespace HubAgentTest
                 }
             };
 
-            var fakeResponseHandler = new FakeHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK));
+            var fakeResponseHandler = new FakeHttpMessageHandler(new List<HttpResponseMessage> () {new HttpResponseMessage(HttpStatusCode.OK)});
             var fakeHttpClient = new HttpClient(fakeResponseHandler);
             fakeHttpClient.BaseAddress = new Uri("https://blah.test.com");
 
@@ -227,7 +228,7 @@ namespace HubAgentTest
                 }
             };
 
-            var fakeResponseHandler = new FakeHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.NotFound));
+            var fakeResponseHandler = new FakeHttpMessageHandler(new List<HttpResponseMessage>() { new HttpResponseMessage(HttpStatusCode.NotFound) });
             var fakeHttpClient = new HttpClient(fakeResponseHandler);
             fakeHttpClient.BaseAddress = new Uri("https://blah.test.com");
 
@@ -250,7 +251,7 @@ namespace HubAgentTest
         /// </summary>
         /// <param name="types">An array of the type of connector to create</param>
         /// <returns></returns>
-        private HttpResponseMessage connectorResponse(string[] types)
+        private List<HttpResponseMessage> connectorResponse(string[] types)
         {
             var httpResponse = new HttpResponseMessage(HttpStatusCode.OK);
 
@@ -289,7 +290,7 @@ namespace HubAgentTest
             serializer.WriteObject(stream, connectorList);
 
             httpResponse.Content = new StringContent(Encoding.UTF8.GetString(stream.ToArray()), Encoding.UTF8, "application/json");
-            return httpResponse;
+            return new List<HttpResponseMessage>() { httpResponse };
         }
 
         /// <summary>
@@ -297,7 +298,7 @@ namespace HubAgentTest
         /// </summary>
         /// <param name="events">A List of Events to return</param>
         /// <returns></returns>
-        private HttpResponseMessage eventResponse(List<Event> events)
+        private List<HttpResponseMessage> eventResponse(List<Event> events, List<Event> subsequent)
         {
             var httpResponse = new HttpResponseMessage(HttpStatusCode.OK);
 
@@ -310,10 +311,21 @@ namespace HubAgentTest
             serializer.WriteObject(stream, events);
 
             httpResponse.Content = new StringContent(Encoding.UTF8.GetString(stream.ToArray()), Encoding.UTF8, "application/json");
-            return httpResponse;
+
+            var subsequentResponse = new HttpResponseMessage(HttpStatusCode.OK);
+
+            MemoryStream subsequentStream = new MemoryStream();
+            DataContractJsonSerializer subSerializer = new DataContractJsonSerializer(typeof(List<Event>), settings);
+
+            serializer.WriteObject(subsequentStream, subsequent);
+
+            httpResponse.Content = new StringContent(Encoding.UTF8.GetString(stream.ToArray()), Encoding.UTF8, "application/json");
+            subsequentResponse.Content = new StringContent(Encoding.UTF8.GetString(subsequentStream.ToArray()), Encoding.UTF8, "application/json");
+
+            return new List<HttpResponseMessage>() { httpResponse, subsequentResponse };
         }
 
-        private HttpResponseMessage connectorResponse(string type)
+        private List<HttpResponseMessage> connectorResponse(string type)
         {
             return connectorResponse(new string[] { type });
         }
