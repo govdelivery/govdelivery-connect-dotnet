@@ -164,6 +164,17 @@ namespace HubAgentTest
                     },
                     Value = 8
                 },
+                new OptionMetadata
+                {
+                    Label = new Label()
+                    {
+                        UserLocalizedLabel = new LocalizedLabel()
+                        {
+                            Label = "Bounced"
+                        }
+                    },
+                    Value = 9
+                }
             };
             var states = new List<OptionMetadata>()
             {
@@ -241,6 +252,17 @@ namespace HubAgentTest
                         }
                     },
                     Value = 8
+                },
+                new OptionMetadata
+                {
+                    Label = new Label()
+                    {
+                        UserLocalizedLabel = new LocalizedLabel()
+                        {
+                            Label = "Bounced"
+                        }
+                    },
+                    Value = 9
                 },
             };
             var states = new List<OptionMetadata>()

@@ -123,8 +123,8 @@ namespace HubAgentTest
             Event invalid_email_status_event = new Event()
             {
                 name = "email_status",
-                message_id = 8082,
-                status = "invalid"
+                external_id = "dyn54c07-3391-4bc0-a68e-911c2a38ed0e",
+                status = "failed"
             };
 
             Event invalid_event = new Event()
@@ -134,11 +134,17 @@ namespace HubAgentTest
                 message_id = 8083
             };
 
+            Event really_invalid_event = new Event()
+            {
+                name = "email_status",
+            };
+
             List<Event> events = new List<Event>();
             events.Add(email_sent_event);
             events.Add(email_status_event);
             events.Add(invalid_email_status_event);
             events.Add(invalid_event);
+            events.Add(really_invalid_event);
 
             var connector = new Connector();
             connector.links = new List<Link>();
@@ -163,6 +169,7 @@ namespace HubAgentTest
 
             mockClient.Verify(dyn => dyn.AssociateGovdeliveryEmail("23a4", "8080"));
             mockClient.Verify(dyn => dyn.UpdateStatus("5cd54c07-3391-4bc0-a68e-911c2a38ed0e","Sent"));
+            mockClient.Verify(dyn => dyn.UpdateStatus(invalid_email_status_event.external_id, "Failed"));
         }
 
         [TestMethod]

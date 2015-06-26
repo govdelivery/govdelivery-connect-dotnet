@@ -102,7 +102,7 @@ namespace HubAgent
         /// <returns></returns>
         public void EnsureEmailMetadata()
         {
-            List<string> expectedStatus = new List<string>(){ "Draft", "Completed",  "Sent", "Received", "Canceled", "Pending Send", "Sending", "Failed" };
+            List<string> expectedStatus = new List<string>(){ "Draft", "Completed",  "Sent", "Received", "Canceled", "Pending Send", "Sending", "Failed", "Bounced" };
             foreach (OptionMetadata attribute in this.getOptionSet("email", "statuscode"))
             {
                 emailStatus[attribute.Label.UserLocalizedLabel.Label] = (int)attribute.Value;
@@ -112,7 +112,6 @@ namespace HubAgent
                 emailState[attribute.Label.UserLocalizedLabel.Label] = (int)attribute.Value;
             }
             var remainderStatus = this.listSubtraction(expectedStatus, emailStatus.Keys.ToList());
-
             foreach (string status in remainderStatus)
             {
                 InsertStatusValueRequest insertStatusValueRequest = new InsertStatusValueRequest()
@@ -272,6 +271,7 @@ namespace HubAgent
         /// <returns></returns>
         public void UpdateStatus(string id, string status)
         {
+            string state = (status == "Failed") ? "Open" : "Completed";
             SetStateRequest stateRequest = new SetStateRequest()
             {
                 EntityMoniker = new EntityReference
@@ -279,7 +279,7 @@ namespace HubAgent
                     Id = new Guid(id),
                     LogicalName = "email"
                 },
-                State = new OptionSetValue((int)this.getState("Completed")),
+                State = new OptionSetValue((int)this.getState(state)),
                 Status = new OptionSetValue((int)this.getStatus(status))
             };
             this.getService().Execute(stateRequest);

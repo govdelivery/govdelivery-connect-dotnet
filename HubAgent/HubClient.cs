@@ -119,7 +119,8 @@ namespace HubAgent
                             DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(List<Event>));
                             events = (List<Event>)serializer.ReadObject(data);
 
-                            Dictionary<int, int> messageStatuses = new Dictionary<int, int>();
+                            Dictionary<string, int> messageStatuses = new Dictionary<string, int>();
+                            Dictionary<string, int> messageStatusesByExternalId = new Dictionary<string, int>();
                             foreach (Event ev in events)
                             {
                                 if (ev.name == "email_sent")
@@ -129,25 +130,39 @@ namespace HubAgent
                                 else if (ev.name == "email_status")
                                 {
                                     var statusIndex = transitions.IndexOf(ev.status);
-                                    if ((statusIndex > -1) && (!messageStatuses.ContainsKey(ev.message_id) ||
-                                        (statusIndex > messageStatuses[ev.message_id])))
-                                    {
-                                        messageStatuses[ev.message_id] = statusIndex;
+                                    if (statusIndex > -1) {
+                                      if (ev.message_id != 0 && IsNewerStatus(statusIndex, messageStatuses, ev.message_id.ToString()))
+                                      {
+                                          messageStatuses[ev.message_id.ToString()] = statusIndex;
+                                      }
+                                      else if (IsNewerStatus(statusIndex, messageStatusesByExternalId, ev.external_id))
+                                      {
+                                          messageStatusesByExternalId[ev.external_id] = statusIndex;
+                                      }
                                     }
                                 }
                             }
-                            foreach (KeyValuePair<int, int> message in messageStatuses)
+                            foreach (KeyValuePair<string, int> message in messageStatuses)
                             {
-                                var dynamicsId = dynamicsClient.LookupEmailByGovdeliveryId(message.Key.ToString());
+                                var dynamicsId = dynamicsClient.LookupEmailByGovdeliveryId(message.Key);
                                 if (dynamicsId != null)
                                 {
                                     dynamicsClient.UpdateStatus(dynamicsId, statuses[message.Value]);
                                 }
                             }
+                            foreach (KeyValuePair<String, int> message in messageStatusesByExternalId)
+                            {
+                                dynamicsClient.UpdateStatus(message.Key, statuses[message.Value]);
+                            }
                         }
                     } while (events.Count > 0);
                 }
             }
+        }
+
+        protected bool IsNewerStatus(int statusIndex, Dictionary<string, int> dict, string messageId)
+        {
+            return (!dict.ContainsKey(messageId) || (statusIndex > dict[messageId]));
         }
     }
 }
