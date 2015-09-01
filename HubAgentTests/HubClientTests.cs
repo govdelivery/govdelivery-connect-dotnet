@@ -124,7 +124,8 @@ namespace HubAgentTest
             {
                 name = "email_status",
                 external_id = "dyn54c07-3391-4bc0-a68e-911c2a38ed0e",
-                status = "failed"
+                status = "failed",
+                error_message = "something terrible happened"
             };
 
             Event invalid_event = new Event()
@@ -157,6 +158,7 @@ namespace HubAgentTest
             var mockClient = new Mock<IDynamicsClient>();
             mockClient.Setup(dyn => dyn.AssociateGovdeliveryEmail(It.IsAny<string>(), It.IsAny<string>()));
             mockClient.Setup(dyn => dyn.UpdateStatus(It.IsAny<string>(), It.IsAny<string>()));
+            mockClient.Setup(dyn => dyn.UpdateErrorMessage(It.IsAny<string>(), It.IsAny<string>()));
             mockClient.Setup(dyn => dyn.LookupEmailByGovdeliveryId(It.IsAny<string>())).Returns("5cd54c07-3391-4bc0-a68e-911c2a38ed0e");
             var hubClient = new HubClient("https://blah.test.com", "blah", mockClient.Object);
 
@@ -168,8 +170,11 @@ namespace HubAgentTest
             hubClient.UpdateEmailStatuses().Wait();
 
             mockClient.Verify(dyn => dyn.AssociateGovdeliveryEmail("23a4", "8080"));
+            mockClient.Verify(dyn => dyn.UpdateErrorMessage("23a4", ""));
             mockClient.Verify(dyn => dyn.UpdateStatus("5cd54c07-3391-4bc0-a68e-911c2a38ed0e","Sent"));
+            mockClient.Verify(dyn => dyn.UpdateErrorMessage("5cd54c07-3391-4bc0-a68e-911c2a38ed0e", null));
             mockClient.Verify(dyn => dyn.UpdateStatus(invalid_email_status_event.external_id, "Failed"));
+            mockClient.Verify(dyn => dyn.UpdateErrorMessage(invalid_email_status_event.external_id, invalid_email_status_event.error_message));
         }
 
         [TestMethod]

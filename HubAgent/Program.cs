@@ -26,7 +26,7 @@ namespace HubAgent
 
             // Ensure that dynamics is properly setup for our use case
             dynamics.EnsureGovdeliveryPublisher();
-            dynamics.EnsureEmailGovdeliveryField();
+            dynamics.EnsureGovdeliveryEmailFields();
             dynamics.EnsureEmailMetadata();
 
             // Retrieve and send emails that are in "Pending Send"

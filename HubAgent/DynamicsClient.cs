@@ -25,12 +25,13 @@ namespace HubAgent
     public interface IDynamicsClient
     {
         void AssociateGovdeliveryEmail(string id, string govdId);
-        void EnsureEmailGovdeliveryField();
+        void EnsureGovdeliveryEmailFields();
         void EnsureEmailMetadata();
         void EnsureGovdeliveryPublisher();
         string LookupEmailByGovdeliveryId(string govdId);
         List<Email> RetrievePendingEmails(string from);
         void UpdateStatus(string id, string status);
+        void UpdateErrorMessage(string id, string errorMessage);
     }
 
     public class DynamicsClient : IDynamicsClient
@@ -46,7 +47,7 @@ namespace HubAgent
             service = new OrganizationService(CrmConnection.Parse("Url=" + url + "; Username=" + username + "; Password=" + password));
         }
 
-        // Externally callabled methods
+        // Externally callable methods
 
         /// <summary>
         /// Associate an email activity with a GovDelivery email by writing the email ID into a field on the entity
@@ -74,7 +75,7 @@ namespace HubAgent
         /// Ensures that a govd_id to hold GovDelivery email IDs exists on email activities
         /// </summary>
         /// <returns></returns>
-        public void EnsureEmailGovdeliveryField()
+        public void EnsureGovdeliveryEmailFields()
         {
             AttributeMetadata[] emailMetadataAttributes = this.retrieveMetadataAttributes("email");
             if (!emailMetadataAttributes.Any(prop => prop.LogicalName.Equals("govd_id")))
@@ -94,6 +95,25 @@ namespace HubAgent
                 };
                 this.getService().Execute(createGovDeliveryRequest);
             }
+
+            if (!emailMetadataAttributes.Any(prop => prop.LogicalName.Equals("govd_error_message")))
+            {
+                CreateAttributeRequest createGovDeliveryRequest = new CreateAttributeRequest
+                {
+                    EntityName = "email",
+                    Attribute = new StringAttributeMetadata()
+                    {
+                        SchemaName = "govd_error_message",
+                        RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None),
+                        MaxLength = 255,
+                        FormatName = StringFormatName.Text,
+                        DisplayName = new Label("GovDelivery Error Message", 1033),
+                        Description = new Label("GovDelivery Email Error Message (if applicable)", 1033)
+                    }
+                };
+                this.getService().Execute(createGovDeliveryRequest);
+            }
+
         }
 
         /// <summary>
@@ -283,6 +303,32 @@ namespace HubAgent
                 Status = new OptionSetValue((int)this.getStatus(status))
             };
             this.getService().Execute(stateRequest);
+        }
+
+        /// <summary>
+        /// Update the error message of an email activity
+        /// </summary>
+        /// <returns></returns>
+        public void UpdateErrorMessage(string id, string errorMessage)
+        {
+            if(errorMessage == null)
+            {
+                return;
+            }
+            RetrieveRequest emailRequest = new RetrieveRequest()
+            {
+                ColumnSet = new ColumnSet("govd_error_message"),
+                Target = new EntityReference("email", new Guid(id))
+            };
+
+            var email = retrieveEntity(emailRequest);
+            email["govd_error_message"] = errorMessage;
+
+            UpdateRequest updateEmail = new UpdateRequest()
+            {
+                Target = email
+            };
+            this.getService().Execute(updateEmail);
         }
 
         // Utility Methods
