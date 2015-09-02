@@ -18,6 +18,8 @@ namespace HubAgent
         internal int message_id;
         [DataMember]
         internal string status;
+        [DataMember]
+        internal string error_message;
     }
 
     [DataContract]

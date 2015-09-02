@@ -120,41 +120,41 @@ namespace HubAgent
                             events = (List<Event>)serializer.ReadObject(data);
 
                             Dictionary<string, int> messageStatuses = new Dictionary<string, int>();
-                            Dictionary<string, int> messageStatusesByExternalId = new Dictionary<string, int>();
-                            foreach (Event ev in events)
+
+                            // update email records with GovDelivery IDs first; they can come out of order
+                            foreach (Event ev in events.Where(ev => ev.name == "email_sent"))
                             {
-                                if (ev.name == "email_sent")
-                                {
-                                    dynamicsClient.AssociateGovdeliveryEmail(ev.external_id, ev.message_id.ToString());
-                                }
-                                else if (ev.name == "email_status")
-                                {
-                                    var statusIndex = transitions.IndexOf(ev.status);
-                                    if (statusIndex > -1) {
-                                      if (ev.message_id != 0 && IsNewerStatus(statusIndex, messageStatuses, ev.message_id.ToString()))
-                                      {
-                                          messageStatuses[ev.message_id.ToString()] = statusIndex;
-                                      }
-                                      else if (IsNewerStatus(statusIndex, messageStatusesByExternalId, ev.external_id))
-                                      {
-                                          messageStatusesByExternalId[ev.external_id] = statusIndex;
-                                      }
-                                    }
-                                }
+                                dynamicsClient.AssociateGovdeliveryEmail(ev.external_id, ev.message_id.ToString());
+                                dynamicsClient.UpdateErrorMessage(ev.external_id, "");
                             }
-                            foreach (KeyValuePair<string, int> message in messageStatuses)
+
+                            // now get all the statuses and update CRM objects as needed
+                            foreach (Event ev in events.Where(ev => ev.name == "email_status" && transitions.IndexOf(ev.status) > -1))
                             {
-                                var dynamicsId = dynamicsClient.LookupEmailByGovdeliveryId(message.Key);
-                                if (dynamicsId != null)
+                                int statusIndex = transitions.IndexOf(ev.status);
+                                string dynamicsId = "";
+
+                                if (ev.message_id != 0)
                                 {
-                                    dynamicsClient.UpdateStatus(dynamicsId, statuses[message.Value]);
+                                    // look up dynamics ID by GovDelivery message ID
+                                    dynamicsId = dynamicsClient.LookupEmailByGovdeliveryId(ev.message_id.ToString());
                                 }
-                            }
-                            foreach (KeyValuePair<String, int> message in messageStatusesByExternalId)
-                            {
-                                dynamicsClient.UpdateStatus(message.Key, statuses[message.Value]);
+                                else
+                                {
+                                    // external_id is the dynamics ID
+                                    dynamicsId = ev.external_id;
+                                }
+
+                                if (dynamicsId != null && IsNewerStatus(statusIndex, messageStatuses, dynamicsId))
+                                {
+                                    messageStatuses[dynamicsId] = statusIndex;
+                                    dynamicsClient.UpdateStatus(dynamicsId, statuses[statusIndex]);
+                                    dynamicsClient.UpdateErrorMessage(dynamicsId, ev.error_message);
+                                }
+
                             }
                         }
+
                     } while (events.Count > 0);
                 }
             }

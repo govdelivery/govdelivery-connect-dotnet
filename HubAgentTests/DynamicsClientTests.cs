@@ -35,6 +35,38 @@ namespace HubAgentTest
         }
 
         [TestMethod]
+        public void TestUpdateErrorMessage()
+        {
+            var service = new Mock<IOrganizationService>();
+            service.Setup(dyn => dyn.Execute(It.IsAny<UpdateRequest>()));
+
+            var client = new Mock<DynamicsClient>("http://blah.test.com", "someone", "password");
+            client.Setup(obj => obj.retrieveEntity(It.IsAny<RetrieveRequest>())).Returns(new Entity());
+            client.Setup(obj => obj.getService()).Returns(service.Object);
+
+            client.Object.UpdateErrorMessage("5cd54c07-3391-4bc0-a68e-911c2a38ed0e", "it did not go well");
+            service.Verify(dyn => dyn.Execute(It.IsAny<UpdateRequest>()));
+            client.Verify(obj => obj.retrieveEntity(It.IsAny<RetrieveRequest>()));
+            client.Verify(obj => obj.getService());
+        }
+
+        [TestMethod]
+        public void TestUpdateNullErrorMessage()
+        {
+            var service = new Mock<IOrganizationService>();
+            service.Setup(dyn => dyn.Execute(It.IsAny<UpdateRequest>()));
+
+            var client = new Mock<DynamicsClient>("http://blah.test.com", "someone", "password");
+            client.Setup(obj => obj.retrieveEntity(It.IsAny<RetrieveRequest>())).Returns(new Entity());
+            client.Setup(obj => obj.getService()).Returns(service.Object);
+
+            client.Object.UpdateErrorMessage("5cd54c07-3391-4bc0-a68e-911c2a38ed0e", null);
+            service.Verify(dyn => dyn.Execute(It.IsAny<UpdateRequest>()), Times.Never());
+            client.Verify(obj => obj.retrieveEntity(It.IsAny<RetrieveRequest>()), Times.Never());
+            client.Verify(obj => obj.getService(), Times.Never());
+        }
+
+        [TestMethod]
         public void TestEnsureEmailGovdeliveryFieldPreexistingField()
         {
             var service = new Mock<IOrganizationService>();
@@ -45,11 +77,12 @@ namespace HubAgentTest
 
             var attributes = new AttributeMetadata[]
                              {
-                                 new AttributeMetadata(){ LogicalName = "govd_id" }
+                                 new AttributeMetadata(){ LogicalName = "govd_id" },
+                                 new AttributeMetadata(){ LogicalName = "govd_error_message" }
                              };
             client.Setup(obj => obj.retrieveMetadataAttributes(It.IsAny<string>())).Returns(attributes);
 
-            client.Object.EnsureEmailGovdeliveryField();
+            client.Object.EnsureGovdeliveryEmailFields();
             client.Verify(obj => obj.retrieveMetadataAttributes(It.IsAny<string>()));
             service.Verify(dyn => dyn.Execute(It.IsAny<CreateAttributeRequest>()), Times.Never());
         }
@@ -66,9 +99,9 @@ namespace HubAgentTest
            var attributes = new AttributeMetadata[]{};
             client.Setup(obj => obj.retrieveMetadataAttributes(It.IsAny<string>())).Returns(attributes);
 
-            client.Object.EnsureEmailGovdeliveryField();
+            client.Object.EnsureGovdeliveryEmailFields();
             client.Verify(obj => obj.retrieveMetadataAttributes(It.IsAny<string>()));
-            service.Verify(dyn => dyn.Execute(It.IsAny<CreateAttributeRequest>()));
+            service.Verify(dyn => dyn.Execute(It.IsAny<CreateAttributeRequest>()), Times.Exactly(2));
         }
 
         [TestMethod]
